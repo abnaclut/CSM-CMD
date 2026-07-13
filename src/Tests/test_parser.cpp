@@ -42,7 +42,7 @@ TEST(CommandParserTest, HandlesEscapedCharacters)
 TEST(CommandParserTest, HandlesEscapedQuoteInsideDoubleQuotes)
 {
   CommandParser parser;
-  const auto tokens = parser.parse("echo \"say \\\"hi\\\"\"");
+  const auto tokens = parser.parse(R"(echo "say \"hi\"")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[1], "say \"hi\"");
 }

@@ -23,10 +23,7 @@ public:
 };
 
 /**
- * @brief Holds the whitelist of registered commands and their aliases.
- *
- * A command may only be executed if it was explicitly registered through
- * registerCommand(). No arbitrary or system command execution is possible.
+ * @brief Command registry that maintains a whitelist of executable commands
  */
 class CommandRegistry
 {
@@ -41,42 +38,44 @@ public:
   };
 
   /**
-   * @brief Register a new command handler under the whitelist.
-   * @throws CommandError if the name is empty or already registered.
+   * @brief Register a new command
+   * @throws CommandError if name is empty or already registered
    */
-  void registerCommand(const std::string& name, CommandHandler handler, const std::string& description);
+  void registerCommand(const std::string& name,
+                       CommandHandler handler,
+                       const std::string& description);
 
   /**
-   * @brief Register an alias that resolves to an already registered command.
-   * @throws CommandError if the target command does not exist.
+   * @brief Register an alias for an existing command
+   * @throws CommandError if target command doesn't exist
    */
   void registerAlias(const std::string& alias, const std::string& target);
 
   /**
-   * @brief Check whether a name (command or alias) is whitelisted.
+   * @brief Check if a command or alias exists
    */
   bool hasCommand(const std::string& name) const;
 
   /**
-   * @brief Execute a whitelisted command by name.
-   * @throws CommandError if the command is not registered.
+   * @brief Execute a command by name
+   * @throws CommandError if command not registered
    */
   int execute(const std::string& name, const std::vector<std::string>& args) const;
 
   /**
-   * @brief Return the human readable description for a command.
+   * @brief Get command description
    */
-  std::string description(const std::string& name) const;
+  std::string getDescription(const std::string& name) const;
 
   /**
-   * @brief List all registered command names, sorted alphabetically.
+   * @brief Get all registered command names, sorted alphabetically
    */
-  std::vector<std::string> commandNames() const;
+  std::vector<std::string> getCommandNames() const;
 
   /**
-   * @brief Return command names starting with the given case-sensitive prefix.
+   * @brief Get completions for a given prefix
    */
-  std::vector<std::string> completions(const std::string& prefix) const;
+  std::vector<std::string> getCompletions(const std::string& prefix) const;
 
 private:
   std::string resolveAlias(const std::string& name) const;

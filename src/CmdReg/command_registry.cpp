@@ -57,7 +57,7 @@ int CommandRegistry::execute(const std::string& name, const std::vector<std::str
   return it->second.handler(args);
 }
 
-std::string CommandRegistry::description(const std::string& name) const
+std::string CommandRegistry::getDescription(const std::string& name) const
 {
   const auto it = commands_.find(resolveAlias(name));
   if (it == commands_.end())
@@ -67,7 +67,7 @@ std::string CommandRegistry::description(const std::string& name) const
   return it->second.description;
 }
 
-std::vector<std::string> CommandRegistry::commandNames() const
+std::vector<std::string> CommandRegistry::getCommandNames() const
 {
   std::vector<std::string> names;
   names.reserve(commands_.size());
@@ -79,7 +79,7 @@ std::vector<std::string> CommandRegistry::commandNames() const
   return names;
 }
 
-std::vector<std::string> CommandRegistry::completions(const std::string& prefix) const
+std::vector<std::string> CommandRegistry::getCompletions(const std::string& prefix) const
 {
   std::vector<std::string> result;
 

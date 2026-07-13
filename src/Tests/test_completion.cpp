@@ -10,7 +10,7 @@ TEST(CompletionTest, EmptyPrefixReturnsAllNames)
   registry.registerCommand("echo", [](const std::vector<std::string>&) { return 0; }, "");
   registry.registerCommand("exit", [](const std::vector<std::string>&) { return 0; }, "");
 
-  const auto completions = registry.completions("");
+  const auto completions = registry.getCompletions("");
   EXPECT_EQ(completions.size(), 2u);
 }
 
@@ -21,7 +21,7 @@ TEST(CompletionTest, PrefixNarrowsCandidates)
   registry.registerCommand("exit", [](const std::vector<std::string>&) { return 0; }, "");
   registry.registerCommand("version", [](const std::vector<std::string>&) { return 0; }, "");
 
-  const auto completions = registry.completions("ex");
+  const auto completions = registry.getCompletions("ex");
   ASSERT_EQ(completions.size(), 1u);
   EXPECT_EQ(completions[0], "exit");
 }
@@ -32,7 +32,7 @@ TEST(CompletionTest, AliasesAppearInCompletions)
   registry.registerCommand("list", [](const std::vector<std::string>&) { return 0; }, "");
   registry.registerAlias("ls", "list");
 
-  const auto completions = registry.completions("ls");
+  const auto completions = registry.getCompletions("ls");
   ASSERT_EQ(completions.size(), 1u);
   EXPECT_EQ(completions[0], "ls");
 }
@@ -42,5 +42,5 @@ TEST(CompletionTest, NoMatchReturnsEmpty)
   CommandRegistry registry;
   registry.registerCommand("help", [](const std::vector<std::string>&) { return 0; }, "");
 
-  EXPECT_TRUE(registry.completions("zzz").empty());
+  EXPECT_TRUE(registry.getCompletions("zzz").empty());
 }

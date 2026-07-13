@@ -61,11 +61,11 @@ TEST(CommandRegistryTest, CompletionsAreCaseSensitivePrefixMatch)
   registry.registerCommand("help", [](const std::vector<std::string>&) { return 0; }, "");
   registry.registerCommand("history", [](const std::vector<std::string>&) { return 0; }, "");
 
-  const auto lower = registry.completions("he");
+  const auto lower = registry.getCompletions("he");
   ASSERT_EQ(lower.size(), 1u);
   EXPECT_EQ(lower[0], "help");
 
-  const auto upper = registry.completions("He");
+  const auto upper = registry.getCompletions("He");
   ASSERT_EQ(upper.size(), 1u);
   EXPECT_EQ(upper[0], "Help");
 }
