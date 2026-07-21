@@ -38,3 +38,4 @@ compiler_depend.internal
 *.zip
 *.7z
 install/
+releases/
