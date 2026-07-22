@@ -7,8 +7,16 @@ using csm_cmd::ParseError;
 
 TEST(CommandParserTest, SplitsSimpleWhitespace)
 {
-  CommandParser parser;
-  const auto tokens = parser.parse("echo hello world");
+  const auto tokens = CommandParser::parse("echo hello world");
+  ASSERT_EQ(tokens.size(), 3u);
+  EXPECT_EQ(tokens[0], "echo");
+  EXPECT_EQ(tokens[1], "hello");
+  EXPECT_EQ(tokens[2], "world");
+}
+
+TEST(CommandParserTest, HandlesMultipleSpaces)
+{
+  const auto tokens = CommandParser::parse("echo   hello    world");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0], "echo");
   EXPECT_EQ(tokens[1], "hello");
@@ -17,52 +25,101 @@ TEST(CommandParserTest, SplitsSimpleWhitespace)
 
 TEST(CommandParserTest, HandlesDoubleQuotedSpaces)
 {
-  CommandParser parser;
-  const auto tokens = parser.parse("echo \"hello world\"");
+  const auto tokens = CommandParser::parse("echo \"hello world\"");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[1], "hello world");
 }
 
 TEST(CommandParserTest, HandlesSingleQuotedSpaces)
 {
-  CommandParser parser;
-  const auto tokens = parser.parse("echo 'hello world'");
+  const auto tokens = CommandParser::parse("echo 'hello world'");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[1], "hello world");
 }
 
-TEST(CommandParserTest, HandlesEscapedCharacters)
+TEST(CommandParserTest, HandlesMixedQuotes)
 {
-  CommandParser parser;
-  const auto tokens = parser.parse("echo hello\\ world");
+  const auto tokens = CommandParser::parse("echo \"hello 'world'\"");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1], "hello 'world'");
+}
+
+TEST(CommandParserTest, HandlesEscapedSpace)
+{
+  const auto tokens = CommandParser::parse("echo hello\\ world");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[1], "hello world");
+}
+
+TEST(CommandParserTest, HandlesEscapedBackslash)
+{
+  const auto tokens = CommandParser::parse("echo hello\\\\world");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1], "hello\\world");
 }
 
 TEST(CommandParserTest, HandlesEscapedQuoteInsideDoubleQuotes)
 {
-  CommandParser parser;
-  const auto tokens = parser.parse(R"(echo "say \"hi\"")");
+  const auto tokens = CommandParser::parse(R"(echo "say \"hi\"")");
   ASSERT_EQ(tokens.size(), 2u);
   EXPECT_EQ(tokens[1], "say \"hi\"");
 }
 
-TEST(CommandParserTest, ThrowsOnUnterminatedQuote)
+TEST(CommandParserTest, HandlesEscapedBackslashInsideDoubleQuotes)
 {
-  CommandParser parser;
-  EXPECT_THROW(parser.parse("echo \"unterminated"), ParseError);
+  const auto tokens = CommandParser::parse(R"(echo "hello\\world")");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1], "hello\\world");
+}
+
+TEST(CommandParserTest, HandlesEmptyDoubleQuotes)
+{
+  const auto tokens = CommandParser::parse("echo \"\"");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0], "echo");
+  EXPECT_EQ(tokens[1], "");
+}
+
+TEST(CommandParserTest, HandlesEmptySingleQuotes)
+{
+  const auto tokens = CommandParser::parse("echo ''");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[0], "echo");
+  EXPECT_EQ(tokens[1], "");
+}
+
+TEST(CommandParserTest, HandlesBackslashAtEnd)
+{
+  const auto tokens = CommandParser::parse("echo hello\\");
+  ASSERT_EQ(tokens.size(), 2u);
+  EXPECT_EQ(tokens[1], "hello\\");
+}
+
+TEST(CommandParserTest, ThrowsOnUnterminatedDoubleQuote)
+{
+  EXPECT_THROW(CommandParser::parse("echo \"unterminated"), ParseError);
+}
+
+TEST(CommandParserTest, ThrowsOnUnterminatedSingleQuote)
+{
+  EXPECT_THROW(CommandParser::parse("echo 'unterminated"), ParseError);
 }
 
 TEST(CommandParserTest, ThrowsOnOversizedInput)
 {
-  CommandParser parser;
   const std::string huge(CommandParser::kMaxInputLength + 1, 'a');
-  EXPECT_THROW(parser.parse(huge), ParseError);
+  EXPECT_THROW(CommandParser::parse(huge), ParseError);
 }
 
 TEST(CommandParserTest, EmptyLineReturnsNoTokens)
 {
-  CommandParser parser;
-  EXPECT_TRUE(parser.parse("").empty());
-  EXPECT_TRUE(parser.parse("   ").empty());
+  EXPECT_TRUE(CommandParser::parse("").empty());
+  EXPECT_TRUE(CommandParser::parse("   ").empty());
+}
+
+TEST(CommandParserTest, OnlyQuotesReturnsEmptyToken)
+{
+  const auto tokens = CommandParser::parse("\"\"");
+  ASSERT_EQ(tokens.size(), 1u);
+  EXPECT_EQ(tokens[0], "");
 }

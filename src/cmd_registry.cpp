@@ -9,6 +9,7 @@ namespace csm_cmd
   void CommandRegistry::registerCommand(const std::string& name, CommandHandler handler, const std::string& description)
   {
     if (name.empty())             { throw CommandError("command name must not be empty"); }
+    if (!handler)                 { throw CommandError("command handler cannot be null"); }
     if (commands_.contains(name)) { throw CommandError("command already registered: " + name); }
 
     commands_.emplace(name, CommandInfo{name, description, std::move(handler)});

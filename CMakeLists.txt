@@ -144,6 +144,8 @@ if(CSM_CMD_BUILD_TESTS)
           src/tests/test_registry.cpp
           src/tests/test_completion.cpp
           src/tests/test_timeout.cpp
+          src/Tests/test_logger.cpp
+          src/Tests/test_registration.cpp
   )
 
   target_link_libraries(csm_cmd_tests
