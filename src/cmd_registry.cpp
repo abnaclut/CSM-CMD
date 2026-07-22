@@ -1,106 +1,89 @@
 #include <cmd_registry.hpp>
 
 #include <algorithm>
+#include <ranges>
 
 namespace csm_cmd
 {
 
-void CommandRegistry::registerCommand(const std::string& name, CommandHandler handler, const std::string& description)
-{
-  if (name.empty())
+  void CommandRegistry::registerCommand(const std::string& name, CommandHandler handler, const std::string& description)
   {
-    throw CommandError("command name must not be empty");
+    if (name.empty())             { throw CommandError("command name must not be empty"); }
+    if (commands_.contains(name)) { throw CommandError("command already registered: " + name); }
+
+    commands_.emplace(name, CommandInfo{name, description, std::move(handler)});
+    command_count++;
   }
 
-  if (commands_.find(name) != commands_.end())
+  void CommandRegistry::registerAlias(const std::string& alias, const std::string& target)
   {
-    throw CommandError("command already registered: " + name);
+    if (!commands_.contains(target)) { throw CommandError("cannot alias unknown command: " + target); }
+
+    aliases_[alias] = target;
   }
 
-  commands_.emplace(name, CommandInfo{name, description, std::move(handler)});
-}
-
-void CommandRegistry::registerAlias(const std::string& alias, const std::string& target)
-{
-  if (commands_.find(target) == commands_.end())
+  std::string CommandRegistry::resolveAlias(const std::string& name) const
   {
-    throw CommandError("cannot alias unknown command: " + target);
+    if (const auto it = aliases_.find(name); it != aliases_.end()) { return it->second; }
+    return name;
   }
 
-  aliases_[alias] = target;
-}
+  bool CommandRegistry::hasCommand(const std::string& name) const { return commands_.contains(resolveAlias(name)); }
 
-std::string CommandRegistry::resolveAlias(const std::string& name) const
-{
-  const auto it = aliases_.find(name);
-  if (it != aliases_.end())
+  int CommandRegistry::execute(const std::string& name, const std::vector<std::string>& args) const
   {
-    return it->second;
-  }
-  return name;
-}
+    const std::string resolved = resolveAlias(name);
+    const auto it = commands_.find(resolved);
+    if (it == commands_.end()) { throw CommandError("unknown command: " + name); }
 
-bool CommandRegistry::hasCommand(const std::string& name) const
-{
-  return commands_.find(resolveAlias(name)) != commands_.end();
-}
-
-int CommandRegistry::execute(const std::string& name, const std::vector<std::string>& args) const
-{
-  const std::string resolved = resolveAlias(name);
-  const auto it = commands_.find(resolved);
-  if (it == commands_.end())
-  {
-    throw CommandError("unknown command: " + name);
+    return it->second.handler(args);
   }
 
-  return it->second.handler(args);
-}
-
-std::string CommandRegistry::getDescription(const std::string& name) const
-{
-  const auto it = commands_.find(resolveAlias(name));
-  if (it == commands_.end())
+  std::string CommandRegistry::getDescription(const std::string& name) const
   {
-    return "";
+    const auto it = commands_.find(resolveAlias(name));
+    if (it == commands_.end()) { return ""; }
+    return it->second.description;
   }
-  return it->second.description;
-}
 
-std::vector<std::string> CommandRegistry::getCommandNames() const
-{
-  std::vector<std::string> names;
-  names.reserve(commands_.size());
-  for (const auto& entry : commands_)
+  std::vector<std::string> CommandRegistry::getCommandNames() const
   {
-    names.push_back(entry.first);
+    std::vector<std::string> names;
+    names.reserve(commands_.size());
+    for (const auto& key : commands_ | std::views::keys) { names.push_back(key); }
+    std::ranges::sort(names);
+    return names;
   }
-  std::sort(names.begin(), names.end());
-  return names;
-}
 
-std::vector<std::string> CommandRegistry::getCompletions(const std::string& prefix) const
-{
-  std::vector<std::string> result;
-
-  for (const auto& entry : commands_)
+  std::unordered_map<std::string, CommandRegistry::CommandInfo> CommandRegistry::getCommands()
   {
-    if (entry.first.compare(0, prefix.size(), prefix) == 0)
+    return commands_;
+  }
+
+  std::vector<std::string> CommandRegistry::getCompletions(const std::string& prefix) const
+  {
+    std::vector<std::string> result;
+
+    for (const auto& key : commands_ | std::views::keys)
     {
-      result.push_back(entry.first);
+      if (key.compare(0, prefix.size(), prefix) == 0) { result.push_back(key); }
     }
-  }
 
-  for (const auto& entry : aliases_)
-  {
-    if (entry.first.compare(0, prefix.size(), prefix) == 0)
+    for (const auto& key : aliases_ | std::views::keys)
     {
-      result.push_back(entry.first);
+      if (key.compare(0, prefix.size(), prefix) == 0) { result.push_back(key); }
     }
+
+    std::ranges::sort(result);
+    return result;
   }
 
-  std::sort(result.begin(), result.end());
-  return result;
-}
+    void CommandRegistry::clear()
+  {
+    commands_.clear();
+    aliases_.clear();
+  }
+
+  unsigned int CommandRegistry::size() const { return command_count; }
 
 }  // namespace csm_cmd

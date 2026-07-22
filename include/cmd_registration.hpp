@@ -1,15 +1,11 @@
 #ifndef CSM_CMD_CMD_REGISTRATION_HPP
 #define CSM_CMD_CMD_REGISTRATION_HPP
 
-#pragma once
-
 #include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
-#include <unordered_map>
 #include <csm_terminal.hpp>
-#include <cmd_registry.hpp>
 
 namespace csm_cmd
 {
@@ -40,24 +36,24 @@ namespace csm_cmd
      * @param handler Function to execute when command is called
      * @param description Human-readable description for help
      * @throws std::invalid_argument if name is empty or handler is null
+     * @throws std::runtime_error if command already exists
      */
-    static void regCmd(const std::string& name,
-                       CommandHandler handler,
-                       const std::string& description);
+    static void regCmd(const std::string& name, CommandHandler handler, const std::string& description);
 
     /**
      * @brief Register an alias for an existing command
      * @param alias Alternative name for the command
      * @param target Original command name
      * @throws std::invalid_argument if alias or target is empty
+     * @throws std::runtime_error if alias already exists or target not found
      */
     static void regAlias(const std::string& alias, const std::string& target);
 
     /**
      * @brief Get all registered commands (for debugging)
-     * @return Const reference to command map
+     * @return Copy of command map (thread-safe)
      */
-    static const std::unordered_map<std::string, CommandRegistry::CommandInfo>& getCommands();
+    static std::unordered_map<std::string, CommandRegistry::CommandInfo> getCommands();
 
     /**
      * @brief Clear all registered commands (for testing)
@@ -71,9 +67,7 @@ namespace csm_cmd
   };
 
   // Convenience aliases for shorter syntax
-  inline void regCmd(const std::string& name,
-                     CommandRegistrar::CommandHandler handler,
-                     const std::string& description)
+  inline void regCmd(const std::string& name, CommandRegistrar::CommandHandler handler, const std::string& description)
   {
     CommandRegistrar::regCmd(name, std::move(handler), description);
   }
@@ -89,6 +83,6 @@ namespace csm_cmd
   Terminal* getTerminal();
   bool isTerminalInitialized();
 
-} // namespace csm_cmd
+}  // namespace csm_cmd
 
-#endif // CSM_CMD_CMD_REGISTRATION_HPP
+#endif  // CSM_CMD_CMD_REGISTRATION_HPP

@@ -68,11 +68,27 @@ public:
   std::vector<std::string> getCommandNames() const;
 
   /**
+   * @brief Get a map of registered commands (name; description)
+   */
+  std::unordered_map<std::string, CommandInfo> getCommands();
+
+  /**
    * @brief Get completions for a given prefix
    */
   std::vector<std::string> getCompletions(const std::string& prefix) const;
 
+  /**
+     * @brief Clear command registry.
+     */
+  void clear();
+
+  /**
+     * @brief Get the registered command count.
+     */
+  unsigned int size() const;
+
 private:
+  unsigned int command_count = 0;
   std::string resolveAlias(const std::string& name) const;
 
   std::unordered_map<std::string, CommandInfo> commands_;

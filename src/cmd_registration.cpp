@@ -4,189 +4,230 @@
 #include <mutex>
 #include <memory>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace csm_cmd
 {
 
-  namespace
+namespace
+{
+
+// Global state
+std::unique_ptr<Terminal> g_terminal;
+std::mutex g_terminal_mutex;
+bool g_initialized = false;
+
+// Pending registrations (for commands registered before terminal init)
+struct PendingCommand
+{
+  std::string name;
+  CommandRegistrar::CommandHandler handler;
+  std::string description;
+};
+
+struct PendingAlias
+{
+  std::string alias;
+  std::string target;
+};
+
+std::vector<PendingCommand> g_pending_commands;
+std::vector<PendingAlias> g_pending_aliases;
+std::mutex g_pending_mutex;
+
+void applyPendingRegistrations()
+{
+  std::lock_guard<std::mutex> lock(g_pending_mutex);
+
+  if (!g_terminal)
   {
-    // Global state
-    std::unique_ptr<Terminal> g_terminal;
-    std::mutex g_terminal_mutex;
-    bool g_initialized = false;
-
-    // Pending registrations (for commands registered before terminal init)
-    struct PendingCommand
-    {
-      std::string name;
-      CommandRegistrar::CommandHandler handler;
-      std::string description;
-    };
-
-    struct PendingAlias
-    {
-      std::string alias;
-      std::string target;
-    };
-
-    std::vector<PendingCommand> g_pending_commands;
-    std::vector<PendingAlias> g_pending_aliases;
-    std::mutex g_pending_mutex;
-
-    // Registered commands storage
-    std::unordered_map<std::string, CommandRegistry::CommandInfo> g_registered_commands;
-    std::mutex g_registered_mutex;
-
-    void applyPendingRegistrations()
-    {
-      std::lock_guard<std::mutex> lock(g_pending_mutex);
-
-      for (const auto& cmd : g_pending_commands)
-      {
-        if (g_terminal)
-        {
-          g_terminal->registerCommand(cmd.name, cmd.handler, cmd.description);
-          Logger::instance().info("Applied pending command: " + cmd.name);
-
-          std::lock_guard<std::mutex> reg_lock(g_registered_mutex);
-          g_registered_commands[cmd.name] = {cmd.name, cmd.description, cmd.handler};
-        }
-      }
-      g_pending_commands.clear();
-
-      for (const auto& alias : g_pending_aliases)
-      {
-        if (g_terminal)
-        {
-          g_terminal->registerAlias(alias.alias, alias.target);
-          Logger::instance().info("Applied pending alias: " + alias.alias + " -> " + alias.target);
-        }
-      }
-      g_pending_aliases.clear();
-    }
+    return;
   }
 
-  // CommandRegistrar implementation
-  void CommandRegistrar::regCmd(const std::string& name,
-                                 CommandHandler handler,
-                                 const std::string& description)
+  auto& registry = g_terminal->getRegistry();
+
+  for (auto& [name, handler, description] : g_pending_commands)
   {
-    if (name.empty())
+    try
     {
-      throw std::invalid_argument("Command name cannot be empty");
+      registry.registerCommand(name, std::move(handler), description);
+      Logger::instance().info("Applied pending command: " + name);
     }
-
-    if (!handler)
+    catch (const std::exception& e)
     {
-      throw std::invalid_argument("Command handler cannot be null");
-    }
-
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
-
-    if (g_initialized && g_terminal)
-    {
-      // Direct registration
-      g_terminal->registerCommand(name, std::move(handler), description);
-      Logger::instance().info("Registered command: " + name);
-
-      std::lock_guard<std::mutex> reg_lock(g_registered_mutex);
-      g_registered_commands[name] = {name, description, handler};
-    }
-    else
-    {
-      // Deferred registration (will be applied when terminal starts)
-      std::lock_guard<std::mutex> pending_lock(g_pending_mutex);
-      g_pending_commands.push_back({name, std::move(handler), description});
-      Logger::instance().debug("Queued command for later registration: " + name);
+      Logger::instance().error("Failed to apply pending command '" + name + "': " + e.what());
     }
   }
+  g_pending_commands.clear();
 
-  void CommandRegistrar::regAlias(const std::string& alias, const std::string& target)
+  for (const auto& [alias, target] : g_pending_aliases)
   {
-    if (alias.empty() || target.empty())
+    try
     {
-      throw std::invalid_argument("Alias and target cannot be empty");
+      registry.registerAlias(alias, target);
+      Logger::instance().info("Applied pending alias: " + alias + " -> " + target);
     }
-
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
-
-    if (g_initialized && g_terminal)
+    catch (const std::exception& e)
     {
-      g_terminal->registerAlias(alias, target);
-      Logger::instance().info("Registered alias: " + alias + " -> " + target);
-    }
-    else
-    {
-      std::lock_guard<std::mutex> pending_lock(g_pending_mutex);
-      g_pending_aliases.push_back({alias, target});
-      Logger::instance().debug("Queued alias for later registration: " + alias + " -> " + target);
+      Logger::instance().error("Failed to apply pending alias '" +
+                               alias + "': " + e.what());
     }
   }
+  g_pending_aliases.clear();
+}
 
-  const std::unordered_map<std::string, CommandRegistry::CommandInfo>& CommandRegistrar::getCommands()
+}  // anonymous namespace
+
+// CommandRegistrar implementation
+void CommandRegistrar::regCmd(const std::string& name,
+                               CommandHandler handler,
+                               const std::string& description)
+{
+  if (name.empty())
   {
-    std::lock_guard<std::mutex> lock(g_registered_mutex);
-    return g_registered_commands;
+    throw std::invalid_argument("Command name cannot be empty");
   }
 
-  void CommandRegistrar::clearCommands()
+  if (!handler)
   {
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
+    throw std::invalid_argument("Command handler cannot be null");
+  }
+
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+
+  if (g_initialized && g_terminal)
+  {
+    auto& registry = g_terminal->getRegistry();
+
+    // Check if command already exists
+    if (registry.hasCommand(name))
+    {
+      throw std::runtime_error("Command already exists: " + name);
+    }
+
+    // Direct registration
+    registry.registerCommand(name, std::move(handler), description);
+    Logger::instance().info("Registered command: " + name);
+  }
+  else
+  {
+    // Deferred registration
     std::lock_guard<std::mutex> pending_lock(g_pending_mutex);
-    std::lock_guard<std::mutex> reg_lock(g_registered_mutex);
+    g_pending_commands.push_back({name, std::move(handler), description});
+    Logger::instance().debug("Queued command for later registration: " + name);
+  }
+}
 
-    g_pending_commands.clear();
-    g_pending_aliases.clear();
-    g_registered_commands.clear();
-
-    Logger::instance().debug("All commands cleared");
+void CommandRegistrar::regAlias(const std::string& alias, const std::string& target)
+{
+  if (alias.empty() || target.empty())
+  {
+    throw std::invalid_argument("Alias and target cannot be empty");
   }
 
-  bool CommandRegistrar::isInitialized()
-  {
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
-    return g_initialized && g_terminal != nullptr;
-  }
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
 
-  // Terminal lifecycle functions
-  void initTerminal(std::chrono::milliseconds timeout)
+  if (g_initialized && g_terminal)
   {
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
+    auto& registry = g_terminal->getRegistry();
 
-    if (!g_initialized)
+    // Check if target exists
+    if (!registry.hasCommand(target))
     {
-      g_terminal = std::make_unique<Terminal>(timeout);
-      g_initialized = true;
-      applyPendingRegistrations();
-      Logger::instance().info("Terminal initialized with " +
-                              std::to_string(g_registered_commands.size()) + " commands");
+      throw std::runtime_error("Target command not found: " + target);
     }
-  }
 
-  void runTerminal()
-  {
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
-
-    if (g_initialized && g_terminal)
+    // Check if alias already exists
+    if (registry.hasCommand(alias))
     {
-      g_terminal->run();
+      throw std::runtime_error("Alias already exists: " + alias);
     }
-    else
-    {
-      Logger::instance().warn("Attempted to run terminal but it was not initialized");
-    }
-  }
 
-  Terminal* getTerminal()
+    registry.registerAlias(alias, target);
+    Logger::instance().info("Registered alias: " + alias + " -> " + target);
+  }
+  else
   {
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
-    return g_terminal.get();
+    std::lock_guard<std::mutex> pending_lock(g_pending_mutex);
+    g_pending_aliases.push_back({alias, target});
+    Logger::instance().debug("Queued alias for later registration: " +
+                             alias + " -> " + target);
   }
+}
 
-  bool isTerminalInitialized()
+std::unordered_map<std::string, CommandRegistry::CommandInfo> CommandRegistrar::getCommands()
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+
+  if (g_terminal)
   {
-    std::lock_guard<std::mutex> lock(g_terminal_mutex);
-    return g_initialized && g_terminal != nullptr;
+    auto& registry = g_terminal->getRegistry();
+    return registry.getCommands();  // return copy
   }
 
-} // namespace csm_cmd
+  return {};
+}
+
+void CommandRegistrar::clearCommands()
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+  std::lock_guard<std::mutex> pending_lock(g_pending_mutex);
+
+  g_pending_commands.clear();
+  g_pending_aliases.clear();
+
+  if (g_terminal)
+  {
+    auto& registry = g_terminal->getRegistry();
+    registry.clear();
+  }
+
+  Logger::instance().debug("All commands cleared");
+}
+
+bool CommandRegistrar::isInitialized()
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+  return g_initialized && g_terminal != nullptr;
+}
+
+// Terminal lifecycle functions
+void initTerminal(std::chrono::milliseconds timeout)
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+
+  if (!g_initialized)
+  {
+    g_terminal = std::make_unique<Terminal>(timeout);
+    g_initialized = true;
+
+    // Apply any pending registrations
+    applyPendingRegistrations();
+
+    const auto& registry = g_terminal->getRegistry();
+    const auto count = registry.size();
+    Logger::instance().info("Terminal initialized with " + std::to_string(count) + " commands");
+  }
+}
+
+void runTerminal()
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+
+  if (g_initialized && g_terminal) { g_terminal->run(); }
+  else { Logger::instance().warn("Attempted to run terminal but it was not initialized"); }
+}
+
+Terminal* getTerminal()
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+  return g_terminal.get();
+}
+
+bool isTerminalInitialized()
+{
+  std::lock_guard<std::mutex> lock(g_terminal_mutex);
+  return g_initialized && g_terminal != nullptr;
+}
+
+}  // namespace csm_cmd

@@ -23,7 +23,7 @@ class Terminal
 public:
   static constexpr std::chrono::milliseconds kDefaultTimeout{100};
   static constexpr std::size_t kMaxHistoryLines = 1000;
-  static constexpr std::size_t kMaxCachedHistory = 128;    // Keep last 128 commands in memory
+  static constexpr std::size_t kMaxCachedHistory = 128;     // Keep last 128 commands in memory
   static constexpr std::size_t kHistoryFlushThreshold = 64; // Flush to file when cache reaches this size
   static constexpr auto kPrompt = "❯ ";
 
@@ -36,9 +36,7 @@ public:
   /**
    * @brief Register a command with its handler and description
    */
-  void registerCommand(const std::string& name,
-                       CommandRegistry::CommandHandler handler,
-                       const std::string& description);
+  void registerCommand(const std::string& name, CommandRegistry::CommandHandler handler, const std::string& description);
 
   /**
    * @brief Register an alias for an existing command
@@ -55,24 +53,26 @@ public:
    */
   void stop();
 
+  CommandRegistry& getRegistry() { return registry_; }
+  const CommandRegistry& getRegistry() const { return registry_; }
 private:
   // Color constants
-  static constexpr const char* kColorReset = "\033[0m";
-  static constexpr const char* kColorBold = "\033[1m";
-  static constexpr const char* kColorDim = "\033[2m";
-  static constexpr const char* kColorCyan = "\033[36m";
-  static constexpr const char* kColorGreen = "\033[32m";
-  static constexpr const char* kColorYellow = "\033[33m";
-  static constexpr const char* kColorRed = "\033[31m";
-  static constexpr const char* kColorBlue = "\033[34m";
+  static constexpr const char* kColorReset   = "\033[0m";
+  static constexpr const char* kColorBold    = "\033[1m";
+  static constexpr const char* kColorDim     = "\033[2m";
+  static constexpr const char* kColorCyan    = "\033[36m";
+  static constexpr const char* kColorGreen   = "\033[32m";
+  static constexpr const char* kColorYellow  = "\033[33m";
+  static constexpr const char* kColorRed     = "\033[31m";
+  static constexpr const char* kColorBlue    = "\033[34m";
   static constexpr const char* kColorMagenta = "\033[35m";
 
   // Bright variants
-  static constexpr const char* kColorBrightCyan = "\033[96m";
-  static constexpr const char* kColorBrightGreen = "\033[92m";
-  static constexpr const char* kColorBrightYellow = "\033[93m";
-  static constexpr const char* kColorBrightRed = "\033[91m";
-  static constexpr const char* kColorBrightBlue = "\033[94m";
+  static constexpr const char* kColorBrightCyan    = "\033[96m";
+  static constexpr const char* kColorBrightGreen   = "\033[92m";
+  static constexpr const char* kColorBrightYellow  = "\033[93m";
+  static constexpr const char* kColorBrightRed     = "\033[91m";
+  static constexpr const char* kColorBrightBlue    = "\033[94m";
   static constexpr const char* kColorBrightMagenta = "\033[95m";
 
   // Background colors
