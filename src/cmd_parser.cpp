@@ -76,15 +76,9 @@ std::vector<std::string> CommandParser::parse(const std::string& line)
     in_token = true;
   }
 
-  if (in_quotes)
-  {
-    throw ParseError("unterminated quote in input");
-  }
+  if (in_quotes) { throw ParseError("unterminated quote in input"); }
 
-  if (in_token)
-  {
-    tokens.push_back(current);
-  }
+  if (in_token) { tokens.push_back(current); }
 
   return tokens;
 }
